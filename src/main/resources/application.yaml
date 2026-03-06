@@ -48,7 +48,7 @@ spring:
 
 # Server config
 server:
-  port: 8080
+  port: 8686
 
 # Logging để debug Spring AI
 logging:
