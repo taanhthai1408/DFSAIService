@@ -236,4 +236,125 @@ public class AiController {
         String answer = multiModalService.describeImage(imageUrl);
         return ResponseEntity.ok(chatService.buildResponse(null, answer));
     }
+
+    // =========================================================
+    // [PgVector] OPTION A — CHAT với context từ PgVector
+    // =========================================================
+
+    /**
+     * [PgVector] POST /api/ai/chat/pgvector
+     * Chat tự động lấy context liên quan từ PgVectorStore trước khi trả lời.
+     * Khác /rag/query ở chỗ: được tích hợp trực tiếp trong ChatService.
+     *
+     * Body: { "message": "câu hỏi", "topK": 3, "threshold": 0.0 }
+     */
+    @PostMapping("/chat/pgvector")
+    public ResponseEntity<ChatResponse> chatWithPgVector(@RequestBody ChatRequest request) {
+        log.info("[PgVector] POST /api/ai/chat/pgvector: {}", request.getMessage());
+        int topK = (request.getTopK() != null) ? request.getTopK() : 3;
+        double threshold = (request.getThreshold() != null) ? request.getThreshold() : 0.0;
+        String answer = chatService.chatWithPgVectorContext(request.getMessage(), topK, threshold);
+        return ResponseEntity.ok(chatService.buildResponse(null, answer));
+    }
+
+    // =========================================================
+    // [PgVector] OPTION B — EMBED với metadata filter
+    // =========================================================
+
+    /**
+     * [PgVector] POST /api/ai/embed/search-filter
+     * Semantic search với metadata filter trong PgVectorStore.
+     *
+     * Body: { "query": "...", "topK": 5, "threshold": 0.0, "filter": "source ==
+     * 'input.txt'" }
+     */
+    @PostMapping("/embed/search-filter")
+    public ResponseEntity<Map<String, Object>> searchWithFilter(@RequestBody Map<String, Object> body) {
+        log.info("[PgVector] POST /api/ai/embed/search-filter");
+        String query = (String) body.get("query");
+        int topK = body.containsKey("topK") ? (int) body.get("topK") : 5;
+        double threshold = body.containsKey("threshold") ? ((Number) body.get("threshold")).doubleValue() : 0.0;
+        String filter = (String) body.getOrDefault("filter", null);
+
+        List<org.springframework.ai.document.Document> docs = (filter != null && !filter.isBlank())
+                ? embeddingService.semanticSearchWithFilter(query, topK, threshold, filter)
+                : embeddingService.semanticSearch(query, topK, threshold);
+
+        List<String> texts = docs.stream()
+                .map(d -> d.getText() != null ? d.getText() : "")
+                .collect(java.util.stream.Collectors.toList());
+
+        return ResponseEntity.ok(Map.of("query", query, "filter", filter != null ? filter : "", "results", texts));
+    }
+
+    /**
+     * [PgVector] DELETE /api/ai/embed/delete
+     * Xóa documents khỏi PgVectorStore theo danh sách ID.
+     *
+     * Body: { "ids": ["uuid1", "uuid2"] }
+     */
+    @DeleteMapping("/embed/delete")
+    public ResponseEntity<Map<String, Object>> deleteEmbeddings(@RequestBody Map<String, Object> body) {
+        @SuppressWarnings("unchecked")
+        List<String> ids = (List<String>) body.get("ids");
+        log.info("[PgVector] DELETE /api/ai/embed/delete: {} ids", ids.size());
+        embeddingService.deleteDocuments(ids);
+        return ResponseEntity.ok(Map.of("status", "deleted", "count", ids.size()));
+    }
+
+    // =========================================================
+    // [PgVector] OPTION C — RAG Document Management
+    // =========================================================
+
+    /**
+     * [PgVector] DELETE /api/ai/rag/delete
+     * Xóa documents khỏi PgVectorStore theo ID.
+     *
+     * Body: { "ids": ["uuid1", "uuid2"] } hoặc { "all": true } để xóa tất cả
+     */
+    @DeleteMapping("/rag/delete")
+    public ResponseEntity<Map<String, Object>> deleteDocuments(@RequestBody Map<String, Object> body) {
+        log.info("[PgVector] DELETE /api/ai/rag/delete");
+        Boolean all = (Boolean) body.getOrDefault("all", false);
+        if (Boolean.TRUE.equals(all)) {
+            ragService.deleteAllDocuments();
+            return ResponseEntity.ok(Map.of("status", "all_deleted"));
+        }
+        @SuppressWarnings("unchecked")
+        List<String> ids = (List<String>) body.get("ids");
+        ragService.deleteDocuments(ids);
+        return ResponseEntity.ok(Map.of("status", "deleted", "count", ids.size()));
+    }
+
+    /**
+     * [PgVector] GET /api/ai/rag/count
+     * Đếm số documents đang có trong PgVectorStore.
+     */
+    @GetMapping("/rag/count")
+    public ResponseEntity<Map<String, Object>> countDocuments() {
+        log.info("[PgVector] GET /api/ai/rag/count");
+        long count = ragService.countDocuments();
+        return ResponseEntity.ok(Map.of("count", count));
+    }
+
+    /**
+     * [PgVector] POST /api/ai/rag/retrieve/filter
+     * Retrieve documents với metadata filter rồi trả về text.
+     *
+     * Body: { "question": "...", "topK": 5, "filter": "source == 'input.txt'" }
+     */
+    @PostMapping("/rag/retrieve/filter")
+    public ResponseEntity<Map<String, Object>> retrieveWithFilter(@RequestBody RagRequest request) {
+        log.info("[PgVector] POST /api/ai/rag/retrieve/filter: filter={}", request.getFilter());
+        List<org.springframework.ai.document.Document> docs = ragService.retrieveDocumentsWithFilter(
+                request.getQuestion(),
+                request.getTopK() != null ? request.getTopK() : 5,
+                request.getFilter());
+        List<String> texts = docs.stream()
+                .map(d -> d.getText() != null ? d.getText() : "")
+                .collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(Map.of("question", request.getQuestion(),
+                "filter", request.getFilter() != null ? request.getFilter() : "",
+                "documents", texts));
+    }
 }

@@ -1,0 +1,15 @@
+Spring AI là một framework của Spring giúp tích hợp các mô hình AI vào ứng dụng Java một cách dễ dàng.
+PgVector là extension của PostgreSQL cho phép lưu trữ và tìm kiếm vector embedding hiệu quả.
+Ollama là công cụ cho phép chạy các mô hình LLM (Large Language Model) cục bộ trên máy tính.
+Llama3 là mô hình ngôn ngữ lớn do Meta phát triển, hỗ trợ nhiều ngôn ngữ bao gồm tiếng Việt.
+RAG (Retrieval Augmented Generation) là kỹ thuật kết hợp tìm kiếm tài liệu liên quan với sinh văn bản từ LLM.
+Embedding là quá trình chuyển đổi văn bản thành vector số thực để máy tính có thể so sánh ngữ nghĩa.
+Vector Store là cơ sở dữ liệu chuyên dụng lưu trữ các vector embedding và hỗ trợ tìm kiếm similarity search.
+HNSW (Hierarchical Navigable Small World) là thuật toán index cho phép tìm kiếm vector nhanh với độ chính xác cao.
+Cosine Similarity là phép đo độ tương đồng giữa hai vector, kết quả từ -1 đến 1, giá trị 1 nghĩa là hoàn toàn giống nhau.
+Spring Boot là framework Java giúp xây dựng ứng dụng web và microservice nhanh chóng với cấu hình tối thiểu.
+PostgreSQL là hệ quản trị cơ sở dữ liệu quan hệ mã nguồn mở mạnh mẽ, hỗ trợ nhiều kiểu dữ liệu đặc biệt.
+ChatClient trong Spring AI là interface cung cấp API đơn giản để giao tiếp với các mô hình chat AI.
+Streaming response cho phép nhận kết quả từ AI theo từng token thay vì chờ toàn bộ câu trả lời.
+Function Calling là tính năng cho phép AI gọi các hàm Java được định nghĩa sẵn để thực hiện tác vụ cụ thể.
+Multimodal AI là mô hình AI có khả năng xử lý nhiều loại dữ liệu như text, hình ảnh, âm thanh cùng lúc.

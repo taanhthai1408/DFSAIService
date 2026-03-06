@@ -10,11 +10,15 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.document.Document;
 import org.springframework.ai.ollama.api.OllamaOptions;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * =============================================================
@@ -29,6 +33,9 @@ public class ChatService {
         private final ChatClient chatClient;
         private final ChatModel chatModel;
         private final ChatMemory chatMemory;
+
+        // [PgVector] Inject VectorStore để lấy context liên quan khi chat
+        private final VectorStore vectorStore;
 
         // =========================================================
         // 1. SIMPLE CHAT
@@ -161,6 +168,74 @@ public class ChatService {
                                 new SystemMessage(systemInstruction),
                                 new UserMessage(userMessage)));
                 return chatModel.call(prompt).getResult().getOutput().getText();
+        }
+
+        // =========================================================
+        // [PgVector] 7. CHAT VỚI CONTEXT TỪ PGVECTOR
+        // =========================================================
+
+        /**
+         * [PgVector] Chat tự động lấy context liên quan từ PgVectorStore.
+         * Tương đương RAG nhưng được thực hiện ngay trong ChatService.
+         *
+         * Flow:
+         * 1. Tìm topK documents gần nhất với câu hỏi trong PgVector
+         * 2. Ghép nội dung documents thành context
+         * 3. Gửi prompt có context đến Ollama / llama3
+         *
+         * @param question  Câu hỏi của người dùng
+         * @param topK      Số document context tối đa lấy từ PgVector
+         * @param threshold Ngưỡng similarity tối thiểu (0.0 = lấy tất cả)
+         */
+        public String chatWithPgVectorContext(String question, int topK, double threshold) {
+                log.debug("[PgVector] ChatWithPgVectorContext: topK={}, threshold={}, question={}",
+                                topK, threshold, question);
+
+                // Bước 1: Tìm documents liên quan từ PgVectorStore
+                List<Document> contextDocs = vectorStore.similaritySearch(
+                                SearchRequest.builder()
+                                                .query(question)
+                                                .topK(topK)
+                                                .similarityThreshold(threshold)
+                                                .build());
+
+                log.debug("[PgVector] Found {} relevant documents", contextDocs.size());
+
+                // Bước 2: Nếu không có context, chat trực tiếp không kèm context
+                if (contextDocs.isEmpty()) {
+                        log.warn("[PgVector] No relevant context found, falling back to direct chat");
+                        return simpleChat(question);
+                }
+
+                // Bước 3: Ghép nội dung documents thành context block
+                String context = contextDocs.stream()
+                                .map(Document::getText)
+                                .collect(Collectors.joining("\n\n---\n\n"));
+
+                // Bước 4: Build augmented prompt với context
+                String augmentedPrompt = """
+                                Dưới đây là thông tin tham khảo từ cơ sở dữ liệu:
+
+                                %s
+
+                                ---
+                                Dựa trên thông tin trên, hãy trả lời câu hỏi sau:
+                                %s
+
+                                Nếu thông tin trên không đủ để trả lời, hãy cho biết.
+                                """.formatted(context, question);
+
+                return chatClient.prompt()
+                                .user(augmentedPrompt)
+                                .call()
+                                .content();
+        }
+
+        /**
+         * [PgVector] Overload với topK=3 và threshold=0.0 mặc định.
+         */
+        public String chatWithPgVectorContext(String question) {
+                return chatWithPgVectorContext(question, 3, 0.0);
         }
 
         // =========================================================

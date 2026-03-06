@@ -7,7 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.vectorstore.SimpleVectorStore;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.chat.memory.ChatMemory;
 
@@ -29,7 +29,7 @@ class RagServiceTest {
     private ChatClient chatClient;
 
     @Mock
-    private SimpleVectorStore simpleVectorStore;
+    private VectorStore vectorStore;
 
     @Mock
     private ChatMemory chatMemory;
@@ -66,14 +66,14 @@ class RagServiceTest {
     void loadDocuments_shouldAddToVectorStore() {
         List<String> texts = List.of("Document 1", "Document 2", "Document 3");
         ragService.loadDocuments(texts);
-        verify(simpleVectorStore).add(argThat(docs -> docs.size() == 3));
+        verify(vectorStore).add(argThat(docs -> docs.size() == 3));
     }
 
     @Test
     @DisplayName("loadDocuments - empty list adds nothing")
     void loadDocuments_emptyList_shouldAddEmptyList() {
         ragService.loadDocuments(Collections.emptyList());
-        verify(simpleVectorStore).add(argThat(List::isEmpty));
+        verify(vectorStore).add(argThat(List::isEmpty));
     }
 
     @Test
@@ -84,7 +84,7 @@ class RagServiceTest {
                 java.util.Map.of("source", "file1.txt"),
                 java.util.Map.of("source", "file2.txt"));
         ragService.loadDocumentsWithMetadata(texts, metas);
-        verify(simpleVectorStore).add(argThat(docs -> docs.size() == 2));
+        verify(vectorStore).add(argThat(docs -> docs.size() == 2));
     }
 
     // =========================================================
@@ -95,19 +95,19 @@ class RagServiceTest {
     @DisplayName("ragQuery - with relevant docs builds augmented prompt")
     void ragQuery_withRelevantDocs_shouldBuildAugmentedPrompt() {
         Document mockDoc = new Document("Spring AI is a framework for AI integration.");
-        when(simpleVectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(mockDoc));
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(mockDoc));
 
         String result = ragService.ragQuery("What is Spring AI?", 3);
 
         assertThat(result).isEqualTo("RAG answer");
-        verify(simpleVectorStore).similaritySearch(any(SearchRequest.class));
+        verify(vectorStore).similaritySearch(any(SearchRequest.class));
         verify(chatClient).prompt();
     }
 
     @Test
     @DisplayName("ragQuery - no docs found falls back to direct question")
     void ragQuery_noDocsFound_shouldFallBackToDirect() {
-        when(simpleVectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(Collections.emptyList());
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(Collections.emptyList());
 
         String result = ragService.ragQuery("Unknown question");
 
@@ -118,9 +118,9 @@ class RagServiceTest {
     @Test
     @DisplayName("ragQuery with default topK=3")
     void ragQuery_defaultTopK_shouldUseTopK3() {
-        when(simpleVectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(Collections.emptyList());
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(Collections.emptyList());
         ragService.ragQuery("test");
-        verify(simpleVectorStore).similaritySearch(any(SearchRequest.class));
+        verify(vectorStore).similaritySearch(any(SearchRequest.class));
     }
 
     @Test
@@ -129,7 +129,7 @@ class RagServiceTest {
         List<Document> docs = List.of(
                 new Document("Document content A"),
                 new Document("Document content B"));
-        when(simpleVectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(docs);
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(docs);
 
         ragService.ragQuery("question", 2);
 
@@ -158,7 +158,7 @@ class RagServiceTest {
     @DisplayName("retrieveDocuments - calls similaritySearch")
     void retrieveDocuments_shouldCallSimilaritySearch() {
         Document doc = new Document("Result document");
-        when(simpleVectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(doc));
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(doc));
 
         List<Document> result = ragService.retrieveDocuments("query", 5);
 
@@ -169,7 +169,7 @@ class RagServiceTest {
     @Test
     @DisplayName("retrieveTexts - returns text content of documents")
     void retrieveTexts_shouldReturnTexts() {
-        when(simpleVectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(
                 new Document("Text 1"), new Document("Text 2")));
 
         List<String> texts = ragService.retrieveTexts("query", 5);
@@ -180,7 +180,7 @@ class RagServiceTest {
     @Test
     @DisplayName("retrieveDocuments - empty result when store is empty")
     void retrieveDocuments_emptyStore_shouldReturnEmpty() {
-        when(simpleVectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(Collections.emptyList());
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(Collections.emptyList());
         List<Document> result = ragService.retrieveDocuments("query", 3);
         assertThat(result).isEmpty();
     }

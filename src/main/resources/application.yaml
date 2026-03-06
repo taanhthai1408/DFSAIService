@@ -2,6 +2,15 @@ spring:
   application:
     name: springAI
 
+  # =========================================================
+  # PostgreSQL DataSource (dùng cho PgVectorStore)
+  # =========================================================
+  datasource:
+    url: jdbc:postgresql://10.30.1.200:5432/postgres
+    username: postgres
+    password: postgresql
+    driver-class-name: org.postgresql.Driver
+
   ai:
     ollama:
       # Ollama server URL
@@ -22,6 +31,20 @@ spring:
       embedding:
         enabled: true
         model: llama3            # dùng llama3 cho embedding (hoặc nomic-embed-text nếu có)
+
+    # =========================================================
+    # PgVector Store Configuration
+    # =========================================================
+    vectorstore:
+      pgvector:
+        index-type: NONE                  # llama3 có 4096 dims, vượt giới hạn HNSW/IVFFlat (max 2000)
+                                           # Dùng NONE = exact search, OK cho dataset vừa phải
+                                           # Nếu muốn HNSW: đổi model sang nomic-embed-text (768 dims)
+        distance-type: COSINE_DISTANCE   # Cosine similarity (phù hợp với text embedding)
+        dimensions: 4096                 # llama3 embedding dimension (4096)
+        initialize-schema: true          # Tự động tạo bảng vector_store nếu chưa có
+        schema-name: public
+        table-name: vector_store
 
 # Server config
 server:

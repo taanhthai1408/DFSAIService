@@ -9,7 +9,7 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
 import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
 import org.springframework.ai.vectorstore.SearchRequest;
-import org.springframework.ai.vectorstore.SimpleVectorStore;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
 public class RagService {
 
         private final ChatClient chatClient;
-        private final SimpleVectorStore simpleVectorStore;
+        private final VectorStore vectorStore;
         private final ChatMemory chatMemory;
 
         // =========================================================
@@ -40,7 +40,7 @@ public class RagService {
                 List<Document> docs = texts.stream()
                                 .map(text -> new Document(text))
                                 .collect(Collectors.toList());
-                simpleVectorStore.add(docs);
+                vectorStore.add(docs);
                 log.info("Loaded {} documents into vector store", docs.size());
         }
 
@@ -52,7 +52,7 @@ public class RagService {
                                         : java.util.Map.of();
                         docs.add(new Document(texts.get(i), meta));
                 }
-                simpleVectorStore.add(docs);
+                vectorStore.add(docs);
         }
 
         // =========================================================
@@ -67,7 +67,7 @@ public class RagService {
                                 .topK(topK)
                                 .similarityThreshold(0.0)
                                 .build();
-                List<Document> relevantDocs = simpleVectorStore.similaritySearch(searchRequest);
+                List<Document> relevantDocs = vectorStore.similaritySearch(searchRequest);
 
                 if (relevantDocs.isEmpty()) {
                         log.warn("No relevant documents found for: {}", question);
@@ -111,7 +111,7 @@ public class RagService {
                 log.debug("RAG with RetrievalAugmentationAdvisor: {}", question);
 
                 VectorStoreDocumentRetriever retriever = VectorStoreDocumentRetriever.builder()
-                                .vectorStore(simpleVectorStore)
+                                .vectorStore(vectorStore)
                                 .topK(topK)
                                 .similarityThreshold(0.0)
                                 .build();
@@ -134,7 +134,7 @@ public class RagService {
                 log.debug("RAG+Memory [{}]: {}", conversationId, question);
 
                 VectorStoreDocumentRetriever retriever = VectorStoreDocumentRetriever.builder()
-                                .vectorStore(simpleVectorStore)
+                                .vectorStore(vectorStore)
                                 .topK(3)
                                 .build();
 
@@ -162,12 +162,92 @@ public class RagService {
                                 .query(query)
                                 .topK(topK)
                                 .build();
-                return simpleVectorStore.similaritySearch(request);
+                return vectorStore.similaritySearch(request);
         }
 
         public List<String> retrieveTexts(String query, int topK) {
                 return retrieveDocuments(query, topK).stream()
                                 .map(Document::getText)
                                 .collect(Collectors.toList());
+        }
+
+        // =========================================================
+        // [PgVector] 5. DOCUMENT MANAGEMENT (PgVector persistent ops)
+        // =========================================================
+
+        /**
+         * [PgVector] Xóa documents khỏi PgVectorStore theo danh sách ID.
+         * Khác SimpleVectorStore (in-memory), PgVector lưu vĩnh viễn
+         * nên cần API xóa để dọn dữ liệu cũ.
+         *
+         * @param ids Danh sách UUID (String) của documents cần xóa
+         */
+        public void deleteDocuments(List<String> ids) {
+                log.info("[PgVector] Deleting {} documents by ID", ids.size());
+                vectorStore.delete(ids);
+                log.debug("[PgVector] Deleted document IDs: {}", ids);
+        }
+
+        /**
+         * [PgVector] Xóa toàn bộ documents trong PgVectorStore bằng cách
+         * tìm tất cả documents và xóa theo ID (vì PgVectorStore chưa có API clear()).
+         *
+         * ⚠️ THẬN TRỌNG: Hành động này không thể hoàn tác.
+         */
+        public void deleteAllDocuments() {
+                log.warn("[PgVector] Deleting ALL documents from PgVectorStore!");
+                // Tìm 10000 docs bất kỳ rồi xóa (threshold=0 để lấy tất cả)
+                List<Document> all = vectorStore.similaritySearch(
+                                SearchRequest.builder()
+                                                .query("*")
+                                                .topK(10000)
+                                                .similarityThreshold(0.0)
+                                                .build());
+                if (!all.isEmpty()) {
+                        List<String> ids = all.stream()
+                                        .map(Document::getId)
+                                        .collect(Collectors.toList());
+                        vectorStore.delete(ids);
+                        log.info("[PgVector] Deleted {} documents total", ids.size());
+                } else {
+                        log.info("[PgVector] No documents to delete");
+                }
+        }
+
+        /**
+         * [PgVector] Đếm số documents trong PgVectorStore
+         * bằng cách tìm kiếm với topK lớn.
+         *
+         * @return Số lượng documents hiện có (approximate)
+         */
+        public long countDocuments() {
+                List<Document> docs = vectorStore.similaritySearch(
+                                SearchRequest.builder()
+                                                .query("*")
+                                                .topK(10000)
+                                                .similarityThreshold(0.0)
+                                                .build());
+                long count = docs.size();
+                log.debug("[PgVector] Document count: {}", count);
+                return count;
+        }
+
+        /**
+         * [PgVector] Retrieve documents với metadata filter.
+         * Lọc theo metadata trước, rồi compute similarity.
+         *
+         * @param query            Câu truy vấn
+         * @param topK             Số kết quả tối đa
+         * @param filterExpression Biểu thức lọc metadata, ví dụ: "source ==
+         *                         'input.txt'"
+         */
+        public List<Document> retrieveDocumentsWithFilter(String query, int topK, String filterExpression) {
+                log.debug("[PgVector] RetrieveWithFilter: filter='{}', query='{}'", filterExpression, query);
+                return vectorStore.similaritySearch(
+                                SearchRequest.builder()
+                                                .query(query)
+                                                .topK(topK)
+                                                .filterExpression(filterExpression) // [PgVector] metadata filter
+                                                .build());
         }
 }

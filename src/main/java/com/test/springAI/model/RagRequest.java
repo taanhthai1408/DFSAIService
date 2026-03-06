@@ -23,4 +23,11 @@ public class RagRequest {
 
     /** ID hội thoại (tuỳ chọn, cho RAG + memory) */
     private String conversationId;
+
+    // [PgVector] fields cho các endpoint nâng cấp
+    /** Số kết quả tối đa lấy từ PgVector (mặc định: 5) */
+    private Integer topK;
+
+    /** Biểu thức lọc metadata PgVector, ví dụ: "source == 'input.txt'" */
+    private String filter;
 }

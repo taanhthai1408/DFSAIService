@@ -8,7 +8,7 @@ import org.springframework.ai.embedding.EmbeddingRequest;
 import org.springframework.ai.embedding.EmbeddingResponse;
 import org.springframework.ai.ollama.api.OllamaOptions;
 import org.springframework.ai.vectorstore.SearchRequest;
-import org.springframework.ai.vectorstore.SimpleVectorStore;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
 public class EmbeddingService {
 
     private final EmbeddingModel embeddingModel;
-    private final SimpleVectorStore simpleVectorStore;
+    private final VectorStore vectorStore;
 
     // =========================================================
     // 1. EMBED SINGLE TEXT
@@ -188,21 +188,40 @@ public class EmbeddingService {
     // =========================================================
 
     /**
-     * Thêm documents vào SimpleVectorStore (in-memory).
-     * Documents sẽ được tự động embed và lưu trữ.
+     * [PgVector] Thêm documents vào PgVectorStore.
+     * Documents sẽ được tự động embed bằng Ollama và lưu vào PostgreSQL.
      *
      * @param texts Danh sách text cần thêm vào store
      */
     public void addToVectorStore(List<String> texts) {
-        log.debug("Adding {} documents to vector store", texts.size());
+        log.debug("[PgVector] Adding {} documents to PgVectorStore", texts.size());
         List<Document> docs = texts.stream()
                 .map(Document::new)
                 .collect(Collectors.toList());
-        simpleVectorStore.add(docs);
+        vectorStore.add(docs);
     }
 
     /**
-     * Tìm kiếm semantic trong VectorStore.
+     * [PgVector] Thêm documents kèm metadata vào PgVectorStore.
+     * Metadata cho phép filter khi search sau này.
+     * Ví dụ metadata: {"source": "input.txt", "category": "AI", "lang": "vi"}
+     *
+     * @param texts     Danh sách text
+     * @param metadatas Danh sách metadata tương ứng (cùng index với texts)
+     */
+    public void addToVectorStoreWithMetadata(List<String> texts, List<java.util.Map<String, Object>> metadatas) {
+        log.debug("[PgVector] Adding {} documents with metadata to PgVectorStore", texts.size());
+        List<Document> docs = new java.util.ArrayList<>();
+        for (int i = 0; i < texts.size(); i++) {
+            java.util.Map<String, Object> meta = (i < metadatas.size()) ? metadatas.get(i) : java.util.Map.of();
+            docs.add(new Document(texts.get(i), meta));
+        }
+        vectorStore.add(docs);
+        log.info("[PgVector] Added {} documents with metadata", docs.size());
+    }
+
+    /**
+     * [PgVector] Tìm kiếm semantic trong PgVectorStore.
      *
      * @param query     Câu hỏi / từ khóa tìm kiếm
      * @param topK      Số kết quả tối đa
@@ -210,14 +229,52 @@ public class EmbeddingService {
      * @return Danh sách documents phù hợp nhất
      */
     public List<Document> semanticSearch(String query, int topK, double threshold) {
-        log.debug("SemanticSearch: query='{}...', topK={}, threshold={}",
+        log.debug("[PgVector] SemanticSearch: query='{}...', topK={}, threshold={}",
                 query.substring(0, Math.min(30, query.length())), topK, threshold);
         SearchRequest searchRequest = SearchRequest.builder()
                 .query(query)
                 .topK(topK)
                 .similarityThreshold(threshold)
                 .build();
-        return simpleVectorStore.similaritySearch(searchRequest);
+        return vectorStore.similaritySearch(searchRequest);
+    }
+
+    /**
+     * [PgVector] Tìm kiếm semantic với METADATA FILTER.
+     * PgVector hỗ trợ lọc theo metadata được lưu cùng document.
+     *
+     * Ví dụ filterExpression:
+     * "source == 'input.txt'" - chỉ tìm trong input.txt
+     * "category == 'AI'" - chỉ tìm category AI
+     * "source == 'doc1.txt' || lang == 'vi'" - kết hợp nhiều điều kiện
+     *
+     * @param query            Câu trợ với
+     * @param topK             Số kết quả tối đa
+     * @param threshold        Ngưỡng similarity (0.0 - 1.0)
+     * @param filterExpression Biểu thức lọc metadata (Spring AI Filter DSL)
+     * @return Danh sách documents thỏa điều kiện filter và similarity
+     */
+    public List<Document> semanticSearchWithFilter(
+            String query, int topK, double threshold, String filterExpression) {
+        log.debug("[PgVector] SemanticSearchWithFilter: query='{}', filter='{}'",
+                query.substring(0, Math.min(30, query.length())), filterExpression);
+        SearchRequest searchRequest = SearchRequest.builder()
+                .query(query)
+                .topK(topK)
+                .similarityThreshold(threshold)
+                .filterExpression(filterExpression) // [PgVector] Metadata filter
+                .build();
+        return vectorStore.similaritySearch(searchRequest);
+    }
+
+    /**
+     * [PgVector] Xóa documents khỏi PgVectorStore theo danh sách ID.
+     *
+     * @param ids Danh sách UUID của documents cần xóa
+     */
+    public void deleteDocuments(List<String> ids) {
+        log.info("[PgVector] Deleting {} documents from PgVectorStore", ids.size());
+        vectorStore.delete(ids);
     }
 
     // =========================================================

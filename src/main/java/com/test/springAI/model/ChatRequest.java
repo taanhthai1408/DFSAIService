@@ -25,4 +25,11 @@ public class ChatRequest {
 
     /** Temperature (0.0 - 1.0). Null = dùng config mặc định */
     private Double temperature;
+
+    // [PgVector] fields cho /chat/pgvector endpoint
+    /** Số documents context tối đa lấy từ PgVector (mặc định: 3) */
+    private Integer topK;
+
+    /** Ngưỡng similarity tối thiểu (0.0 - 1.0, mặc định: 0.0) */
+    private Double threshold;
 }
