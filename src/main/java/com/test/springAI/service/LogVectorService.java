@@ -4,7 +4,7 @@ import com.test.springAI.model.LogEntry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.vectorstore.SimpleVectorStore;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class LogVectorService {
 
-    private final SimpleVectorStore vectorStore;
+    private final VectorStore vectorStore;
 
     /**
      * Store a list of LogEntry objects in the vector store
@@ -65,6 +65,9 @@ public class LogVectorService {
         String entryId = (entry.getId() == null || entry.getId().trim().isEmpty()) 
                 ? UUID.randomUUID().toString() 
                 : entry.getId();
+                
+        // Spring AI strictly forbids null values in metadata map
+        metadata.values().removeIf(java.util.Objects::isNull);
                 
         return new Document(entryId, content, metadata);
     }

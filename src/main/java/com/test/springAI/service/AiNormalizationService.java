@@ -97,6 +97,9 @@ public class AiNormalizationService {
             }
         }
         
+        // Remove dummy/empty entries the AI might have hallucinated
+        entries.removeIf(e -> e.getMessage() == null || e.getMessage().trim().isEmpty());
+        
         return entries;
     }
 
@@ -126,6 +129,15 @@ public class AiNormalizationService {
                 mapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
                 // Crucial: allow backslashes before any character (like Windows paths \C)
                 mapper.configure(com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_BACKSLASH_ESCAPING_ANY_CHARACTER, true);
+                
+                // CRITICAL FOR EPOCH PARSING:
+                // Allow AI to return numeric epoch time instead of Strings
+                mapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.READ_DATE_TIMESTAMPS_AS_NANOSECONDS, false);
+                // When parsing epoch ms to LocalDateTime, Jackson needs a TimeZone context
+                mapper.setTimeZone(java.util.TimeZone.getDefault());
+                
+                // Ignore extra fields AI might invent
+                mapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
                 
                 if (type instanceof Class) {
                     return mapper.readValue(cleanJson, (Class<T>) type);
