@@ -1,0 +1,413 @@
+{
+  "info": {
+    "name": "Spring AI - AiController",
+    "_postman_id": "springai-collection-001",
+    "description": "Toàn bộ API trong AiController của dự án Spring AI. Base: POST /api/ai/**",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Chat",
+      "item": [
+        {
+          "name": "1. Simple Chat",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/ai/chat", "host": ["{{baseUrl}}"], "path": ["api","ai","chat"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Xin chào! Bạn là ai?\"\n}"
+            }
+          }
+        },
+        {
+          "name": "2. Chat with System Prompt",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/ai/chat/system", "host": ["{{baseUrl}}"], "path": ["api","ai","chat","system"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Giúp mình viết một đoạn code Java đơn giản.\",\n  \"systemPrompt\": \"Bạn là một lập trình viên Java senior. Hãy trả lời bằng tiếng Việt.\"\n}"
+            }
+          }
+        },
+        {
+          "name": "3. Chat with Memory",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/ai/chat/memory", "host": ["{{baseUrl}}"], "path": ["api","ai","chat","memory"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Tên tôi là Nam.\",\n  \"conversationId\": \"session-001\"\n}"
+            }
+          }
+        },
+        {
+          "name": "4. Stream Chat (SSE)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "text/event-stream" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/ai/stream?message=Kể cho tôi nghe một câu chuyện ngắn",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","ai","stream"],
+              "query": [{ "key": "message", "value": "Kể cho tôi nghe một câu chuyện ngắn" }]
+            }
+          }
+        },
+        {
+          "name": "5. Chat with PgVector Context",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/ai/chat/pgvector", "host": ["{{baseUrl}}"], "path": ["api","ai","chat","pgvector"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Spring AI hỗ trợ những tính năng gì?\",\n  \"topK\": 3,\n  \"threshold\": 0.5\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Prompt Engineering",
+      "item": [
+        {
+          "name": "6. Prompt Template",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/ai/prompt/template?template=Hãy giải thích {topic} theo cách đơn giản nhất",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","ai","prompt","template"],
+              "query": [{ "key": "template", "value": "Hãy giải thích {topic} theo cách đơn giản nhất" }]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"topic\": \"machine learning\"\n}"
+            }
+          }
+        },
+        {
+          "name": "7. Translate Text",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/ai/prompt/translate?language=English",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","ai","prompt","translate"],
+              "query": [{ "key": "language", "value": "English" }]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Xin chào, hôm nay bạn có khỏe không?\"\n}"
+            }
+          }
+        },
+        {
+          "name": "8. Summarize Text",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/ai/prompt/summarize?maxSentences=3",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","ai","prompt","summarize"],
+              "query": [{ "key": "maxSentences", "value": "3" }]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Spring AI là một framework mạnh mẽ cho phép tích hợp các mô hình AI vào ứng dụng Spring Boot. Nó hỗ trợ nhiều nhà cung cấp AI khác nhau như OpenAI, Anthropic, Google Gemini. Ngoài ra, Spring AI còn cung cấp các tính năng như RAG, function calling, multimodal, và vector store. Đây là một công cụ rất hữu ích cho các nhà phát triển Java muốn tích hợp AI vào ứng dụng của mình.\"\n}"
+            }
+          }
+        },
+        {
+          "name": "9. Chain-of-Thought (CoT)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/ai/prompt/cot", "host": ["{{baseUrl}}"], "path": ["api","ai","prompt","cot"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"Nếu một cửa hàng có 120 sản phẩm và bán được 35% trong ngày đầu, 25% số còn lại trong ngày hai, thì sau 2 ngày còn lại bao nhiêu sản phẩm?\"\n}"
+            }
+          }
+        },
+        {
+          "name": "10. Sentiment Analysis (Few-Shot)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/ai/prompt/sentiment", "host": ["{{baseUrl}}"], "path": ["api","ai","prompt","sentiment"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Sản phẩm này thật tuyệt vời, tôi rất hài lòng!\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Embedding",
+      "item": [
+        {
+          "name": "11. Embed Single Text",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/ai/embed", "host": ["{{baseUrl}}"], "path": ["api","ai","embed"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Spring AI là framework tích hợp AI vào Spring Boot\"\n}"
+            }
+          }
+        },
+        {
+          "name": "11b. Embed Batch Texts",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/ai/embed", "host": ["{{baseUrl}}"], "path": ["api","ai","embed"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"texts\": [\n    \"Spring AI hỗ trợ OpenAI\",\n    \"PgVector là vector database dựa trên PostgreSQL\",\n    \"RAG giúp AI trả lời dựa trên tài liệu của bạn\"\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "12. Text Similarity",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/ai/embed/similarity", "host": ["{{baseUrl}}"], "path": ["api","ai","embed","similarity"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"textA\": \"Spring AI tích hợp với OpenAI\",\n  \"textB\": \"Spring AI hỗ trợ GPT models của OpenAI\"\n}"
+            }
+          }
+        },
+        {
+          "name": "13. Semantic Search with Filter",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/ai/embed/search-filter", "host": ["{{baseUrl}}"], "path": ["api","ai","embed","search-filter"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"Spring AI vector store\",\n  \"topK\": 5,\n  \"threshold\": 0.0,\n  \"filter\": \"source == 'input.txt'\"\n}"
+            }
+          }
+        },
+        {
+          "name": "14. Delete Embeddings by IDs",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/ai/embed/delete", "host": ["{{baseUrl}}"], "path": ["api","ai","embed","delete"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": [\n    \"550e8400-e29b-41d4-a716-446655440000\",\n    \"550e8400-e29b-41d4-a716-446655440001\"\n  ]\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "RAG",
+      "item": [
+        {
+          "name": "15. Load Documents",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/ai/rag/load", "host": ["{{baseUrl}}"], "path": ["api","ai","rag","load"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documents\": [\n    \"Spring AI là một framework mạnh mẽ cho phép tích hợp các mô hình trí tuệ nhân tạo vào ứng dụng Spring Boot.\",\n    \"PgVector là một extension của PostgreSQL cho phép lưu trữ và tìm kiếm vector embedding một cách hiệu quả.\",\n    \"RAG (Retrieval Augmented Generation) là kỹ thuật kết hợp tìm kiếm tài liệu với sinh văn bản bằng LLM.\"\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "16. RAG Query",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/ai/rag/query", "host": ["{{baseUrl}}"], "path": ["api","ai","rag","query"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"PgVector là gì và nó hoạt động như thế nào?\"\n}"
+            }
+          }
+        },
+        {
+          "name": "17. RAG Query with Advisor",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/ai/rag/query/advisor", "host": ["{{baseUrl}}"], "path": ["api","ai","rag","query","advisor"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"Spring AI hỗ trợ những tính năng nào?\"\n}"
+            }
+          }
+        },
+        {
+          "name": "18. RAG Retrieve Only",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/ai/rag/retrieve", "host": ["{{baseUrl}}"], "path": ["api","ai","rag","retrieve"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"RAG là gì?\"\n}"
+            }
+          }
+        },
+        {
+          "name": "19. Retrieve with Metadata Filter",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/ai/rag/retrieve/filter", "host": ["{{baseUrl}}"], "path": ["api","ai","rag","retrieve","filter"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"Spring AI vector store hoạt động ra sao?\",\n  \"topK\": 5,\n  \"filter\": \"source == 'input.txt'\"\n}"
+            }
+          }
+        },
+        {
+          "name": "20. Count Documents",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/ai/rag/count", "host": ["{{baseUrl}}"], "path": ["api","ai","rag","count"] }
+          }
+        },
+        {
+          "name": "21. Delete Documents by IDs",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/ai/rag/delete", "host": ["{{baseUrl}}"], "path": ["api","ai","rag","delete"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": [\n    \"550e8400-e29b-41d4-a716-446655440000\",\n    \"550e8400-e29b-41d4-a716-446655440001\"\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "21b. Delete ALL Documents",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/ai/rag/delete", "host": ["{{baseUrl}}"], "path": ["api","ai","rag","delete"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"all\": true\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tools (Function Calling)",
+      "item": [
+        {
+          "name": "22. Weather Tool",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/ai/tools/weather", "host": ["{{baseUrl}}"], "path": ["api","ai","tools","weather"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Thời tiết ở Hà Nội hôm nay như thế nào?\"\n}"
+            }
+          }
+        },
+        {
+          "name": "23. Calculator Tool",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/ai/tools/calc", "host": ["{{baseUrl}}"], "path": ["api","ai","tools","calc"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Tính 123 * 456 + 789 bằng bao nhiêu?\"\n}"
+            }
+          }
+        },
+        {
+          "name": "24. Time Tool",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/ai/tools/time", "host": ["{{baseUrl}}"], "path": ["api","ai","tools","time"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Bây giờ là mấy giờ?\"\n}"
+            }
+          }
+        },
+        {
+          "name": "25. All Tools",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/ai/tools/all", "host": ["{{baseUrl}}"], "path": ["api","ai","tools","all"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Thời tiết Hà Nội hôm nay và 25 * 4 bằng bao nhiêu?\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Vision (Multimodal)",
+      "item": [
+        {
+          "name": "26. Analyze Image from URL",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/ai/vision/url?imageUrl=https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/280px-PNG_transparency_demonstration_1.png",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","ai","vision","url"],
+              "query": [{ "key": "imageUrl", "value": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/280px-PNG_transparency_demonstration_1.png" }]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Bức ảnh này mô tả điều gì? Hãy giải thích chi tiết.\"\n}"
+            }
+          }
+        },
+        {
+          "name": "27. Describe Image",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ai/vision/describe?imageUrl=https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/280px-PNG_transparency_demonstration_1.png",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","ai","vision","describe"],
+              "query": [{ "key": "imageUrl", "value": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/280px-PNG_transparency_demonstration_1.png" }]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
