@@ -120,7 +120,14 @@ public class RagService {
                                 .documentRetriever(retriever)
                                 .build();
 
+                String systemPrompt = "You are a senior DevOps engineer and database expert assisting a user with analyzing system logs. " +
+                                "The provided context contains extracted system logs, stack traces, and database queries. " +
+                                "CRITICAL: Translate the user's intent across languages if necessary. If the user asks in Vietnamese for 'câu sql' or 'sql insert', " +
+                                "you MUST find the literal 'insert into' or 'select' statement in the provided English logs. " +
+                                "Only answer based on the log entries provided in the context. Describe the timestamps and sources clearly if found.";
+
                 return chatClient.prompt()
+                                .system(systemPrompt)
                                 .user(question)
                                 .advisors(ragAdvisor)
                                 .call()

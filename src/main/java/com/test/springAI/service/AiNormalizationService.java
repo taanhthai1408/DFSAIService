@@ -23,6 +23,11 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AiNormalizationService {
 
+    private static final java.util.regex.Pattern STANDARD_LOG_PATTERN = java.util.regex.Pattern.compile(
+            "^.*?\\[?(?<timestamp>\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}:\\d{2}(?:[.,]\\d+)?(?:Z|[+\\-]\\d{2}:?\\d{2})?)\\]?\\s+(?:\\[?(?<level>INFO|WARN|ERROR|DEBUG|TRACE|FATAL|SEVERE|NOTICE|WARNING)\\]?)?\\s+(?:.*?(?:---|:))?\\s*(?<message>.*)$",
+            java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.DOTALL
+    );
+
     private final ChatClient chatClient;
 
     /**
@@ -59,41 +64,80 @@ public class AiNormalizationService {
     public List<LogEntry> normalizeBatch(List<String> rawLines, String source) {
         log.info("AI Normalizing batch of {} log lines from source: {}", rawLines.size(), source);
         
-        String input = rawLines.stream()
-                .map(this::truncateLongMessage)
-                .reduce((a, b) -> a + "\n" + b)
-                .orElse("");
-        
-        String response = chatClient.prompt()
-                .system("You are a strict batch log parser. Return ONLY a JSON array of objects. " +
-                        "Essential fields: timestamp (yyyy-MM-dd HH:mm:ss.SSS), level, message, source. " +
-                        "CRITICAL: Output ALL entries. NEVER use ellipses '...' or shortened responses. " +
-                        "If a log entry is multiline (stack trace), treat it as ONE object with the full trace in 'message'. " +
-                        "Always use forward slashes for paths. No markdown, no intro.")
-                .user("Internal logs:\n" + input)
-                .call()
-                .content();
-        
-        List<LogEntry> entries = parseJson(response, new ParameterizedTypeReference<List<LogEntry>>() {});
-        
-        if (entries == null) {
-            log.warn("Failed to parse AI response for source: {}. Returning empty list.", source);
-            return Collections.emptyList();
+        List<LogEntry> fastEntries = new ArrayList<>();
+        List<String> remainingLinesForAi = new ArrayList<>();
+
+        for (String rawLine : rawLines) {
+            java.util.regex.Matcher matcher = STANDARD_LOG_PATTERN.matcher(rawLine);
+            if (matcher.matches()) {
+                String timestampStr = matcher.group("timestamp");
+                String levelStr = matcher.group("level");
+                String messageStr = matcher.group("message");
+                
+                // Fallback for missing or "null" levels
+                if (levelStr == null || levelStr.trim().isEmpty() || levelStr.trim().equalsIgnoreCase("null")) {
+                    levelStr = "INFO";
+                }
+                
+                java.time.LocalDateTime parsedTime = parseTimestamp(timestampStr);
+                if (parsedTime != null) {
+                    // Fast path success!
+                    LogEntry entry = LogEntry.builder()
+                            .id(UUID.randomUUID().toString())
+                            .timestamp(parsedTime)
+                            .level(levelStr.toUpperCase())
+                            .message(messageStr.trim())
+                            .source(source)
+                            .raw(rawLine)
+                            .build();
+                    fastEntries.add(entry);
+                    continue;
+                }
+            }
+            // Failed fast path, send to AI
+            remainingLinesForAi.add(rawLine);
         }
         
-        // Ensure every entry in the list has a unique ID, source, etc.
-        for (int i = 0; i < entries.size(); i++) {
-            LogEntry entry = entries.get(i);
-            if (entry == null) continue;
+        log.info("Hybrid Parsing Strategy: Fast-Regex parsed {} lines. Forwarding {} complex lines to AI.", 
+                 fastEntries.size(), remainingLinesForAi.size());
+                 
+        List<LogEntry> entries = new ArrayList<>(fastEntries);
+
+        if (!remainingLinesForAi.isEmpty()) {
+            String input = remainingLinesForAi.stream()
+                    .map(this::truncateLongMessage)
+                    .reduce((a, b) -> a + "\n" + b)
+                    .orElse("");
             
-            if (entry.getId() == null || entry.getId().trim().isEmpty()) {
-                entry.setId(UUID.randomUUID().toString());
-            }
-            entry.setSource(source);
+            String response = chatClient.prompt()
+                    .system("You are a strict batch log parser. Return ONLY a JSON array of objects. " +
+                            "Essential fields: timestamp (yyyy-MM-dd HH:mm:ss.SSS), level, message, source. " +
+                            "CRITICAL: Output ALL entries. NEVER use ellipses '...' or shortened responses. " +
+                            "If a log entry is multiline (stack trace), treat it as ONE object with the full trace in 'message'. " +
+                            "Always use forward slashes for paths. No markdown, no intro.")
+                    .user("Internal logs:\n" + input)
+                    .call()
+                    .content();
             
-            // Map original raw line if available (within bounds)
-            if (i < rawLines.size()) {
-                entry.setRaw(rawLines.get(i));
+            List<LogEntry> aiEntries = parseJson(response, new ParameterizedTypeReference<List<LogEntry>>() {});
+            
+            if (aiEntries == null) {
+                log.warn("Failed to parse AI response for source: {}.", source);
+            } else {
+                for (int i = 0; i < aiEntries.size(); i++) {
+                    LogEntry entry = aiEntries.get(i);
+                    if (entry == null) continue;
+                    
+                    if (entry.getId() == null || entry.getId().trim().isEmpty()) {
+                        entry.setId(UUID.randomUUID().toString());
+                    }
+                    entry.setSource(source);
+                    
+                    if (i < remainingLinesForAi.size()) {
+                        entry.setRaw(remainingLinesForAi.get(i));
+                    }
+                    entries.add(entry);
+                }
             }
         }
         
@@ -162,5 +206,31 @@ public class AiNormalizationService {
             return msg.substring(0, MAX_LEN) + "\n...[TRUNCATED DUE TO LENGTH]";
         }
         return msg;
+    }
+
+    /**
+     * Parse timestamp string into Java 8 LocalDateTime using multiple common formats.
+     */
+    private java.time.LocalDateTime parseTimestamp(String timeStr) {
+        if (timeStr == null || timeStr.isEmpty()) return null;
+        timeStr = timeStr.replace(',', '.'); // Fix European millisecond comma
+        
+        // Format 1: ISO Zoned DateTime (2026-03-09T23:07:59.376+07:00)
+        try {
+            return java.time.ZonedDateTime.parse(timeStr, java.time.format.DateTimeFormatter.ISO_ZONED_DATE_TIME).toLocalDateTime();
+        } catch (Exception e1) {
+            // Format 2: ISO Local DateTime (2025-06-22T23:27:56.162)
+            try {
+                return java.time.LocalDateTime.parse(timeStr, java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            } catch (Exception e2) {
+                // Format 3: Logback standard format (2025-06-22 23:27:56.162 or 2025-06-22 23:27:56)
+                try {
+                    java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss[.SSS]");
+                    return java.time.LocalDateTime.parse(timeStr, formatter);
+                } catch (Exception e3) {
+                    return null;
+                }
+            }
+        }
     }
 }

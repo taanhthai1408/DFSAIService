@@ -171,7 +171,8 @@ public class LogController {
         String question = body.get("question");
         log.info("AI Q&A with Vector Store: {}", question);
         
-        String answer = ragService.ragWithAdvisor(question, 5); // Retrieve top 5 relevant logs
+        // Retrieve top 15 relevant logs instead of 5 to account for multi-language semantic mismatch
+        String answer = ragService.ragWithAdvisor(question, 15); 
         return ResponseEntity.ok(Map.of("answer", answer));
     }
 }
